@@ -253,8 +253,7 @@ KSEQ_INIT(gzFile, gzread)
                         myfile << ">" << id << "\n" << value << endl;
                     }
                     else if(tag=="P"){
-                        /*TODO* handle k*/
-                        k=4;
+                        k=param.kmerSize;
                         auto pvalue = splited[2];
                         std::vector<std::pair<uint64_t, bool>> contigVec = explode(pvalue, ',');
                         path[ref_cnt] = contigVec;

@@ -1,0 +1,14 @@
+To run mashmap:
+
+./mashmap -g test.gfa-r temp.fa -q query.fa -k 4 -s 500
+
+test.gfa: GFA File.
+query.fa: Query File.
+temp.fa: Temporary FASTA file(created itself).
+4: kmer size.
+500: seq length.
+
+Output Files:
+mashmap.out: MashMap output.
+mapping.txt: Transcript-Contig mapping(in pufferfish format).
+mashmap_dict.txt: MashMap dictionary created for indexing.

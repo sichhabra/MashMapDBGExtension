@@ -273,9 +273,9 @@ namespace skch
         else
         {
             if(parameters.alphabetSize == 4)
-                parameters.kmerSize = 4;
+                parameters.kmerSize = 16;
             else
-                parameters.kmerSize = 4;
+                parameters.kmerSize = 5;
         }
 
         if(cmd.foundOption("segLength"))
@@ -292,7 +292,7 @@ namespace skch
             }
         }
         else
-            parameters.segLength = 500;
+            parameters.segLength = 5000;
 
         if(cmd.foundOption("perc_identity"))
         {

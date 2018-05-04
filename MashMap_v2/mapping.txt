@@ -1,3 +1,4 @@
+Contig ID : space_seperated(transcript_id,position)
 155:50,0 
 60:19,0 
 126:41,0 
