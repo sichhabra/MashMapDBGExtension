@@ -279,14 +279,19 @@ KSEQ_INIT(gzFile, gzread)
 
             std::cout << "INFO, skch::Sketch::index, unique minimizers = " << minimizerPosLookupIndex.size() << std::endl;
 
-            /*for(auto &e : this->minimizerPosLookupIndex){
-              cout<< e.first<<":";
-              for(auto &f : e.second){
-              cout<< f.seqId<<","<<f.wpos<<","<<f.strand<<" ";
-              }
-              cout<<endl;
-              }
-             */
+            //Writing mashmap index to a file.
+            std::ofstream myfile;
+            myfile.open ("mashmap_dict.txt",ios::out);
+
+            myfile << "hash:space_seperated_list[seqId,wpos,strand]" <<endl;
+            for(auto &e : this->minimizerPosLookupIndex){
+                myfile << e.first<<":";
+                for(auto &f : e.second){
+                    myfile << f.seqId<<","<<f.wpos<<","<<f.strand<<" ";
+                }
+                myfile << endl;
+            }
+            myfile.close();
         }
 
         /**
