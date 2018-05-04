@@ -26,6 +26,7 @@
 #include "common/murmur3.h"
 #include "common/prettyprint.hpp"
 #include "common/sparsehash/dense_hash_map"
+#include "sparsepp/spp.h"
 
 KSEQ_INIT(gzFile, gzread)
 
@@ -87,26 +88,93 @@ KSEQ_INIT(gzFile, gzread)
 
 
         // Avoiding un-necessary stream creation + replacing strings with string view
-	// is a bit > than a 2x win!
-	// implementation from : https://marcoarena.wordpress.com/tag/string_view/
-	std::vector<stx::string_view> split(stx::string_view str,
-		                                       char delims) {
-	  std::vector<stx::string_view> ret;
+        // is a bit > than a 2x win!
+        // implementation from : https://marcoarena.wordpress.com/tag/string_view/
+        std::vector<stx::string_view> split(stx::string_view str,
+                char delims) {
+            std::vector<stx::string_view> ret;
 
-	  stx::string_view::size_type start = 0;
-	  auto pos = str.find_first_of(delims, start);
-	  while (pos != stx::string_view::npos) {
-	    if (pos != start) {
-	      ret.push_back(str.substr(start, pos - start));
-	    }
-	    start = pos + 1;
-	    pos = str.find_first_of(delims, start);
-	  }
-	  if (start < str.length()) {
-	    ret.push_back(str.substr(start, str.length() - start));
-	  }
-	  return ret;
-	}
+            stx::string_view::size_type start = 0;
+            auto pos = str.find_first_of(delims, start);
+            while (pos != stx::string_view::npos) {
+                if (pos != start) {
+                    ret.push_back(str.substr(start, pos - start));
+                }
+                start = pos + 1;
+                pos = str.find_first_of(delims, start);
+            }
+            if (start < str.length()) {
+                ret.push_back(str.substr(start, str.length() - start));
+            }
+            return ret;
+        }
+
+        std::vector<std::pair<uint64_t, bool>>
+            explode(const stx::string_view str, const char& ch) {
+                std::string next;
+                std::vector<std::pair<uint64_t, bool>> result;
+                // For each character in the string
+                for (auto it = str.begin(); it != str.end(); it++) {
+                    // If we've hit the terminal character
+                    if (*it == '+' or *it == '-') {
+                        bool orientation = true;
+                        // If we have some characters accumulated
+                        // Add them to the result vector
+                        if (!next.empty()) {
+                            if (*it == '-') {
+                                orientation = false;
+                            }
+                            result.emplace_back(std::stoll(next), orientation);
+                            next.clear();
+                        }
+                    } else if (*it != ch) {
+                        // Accumulate the next character into the sequence
+                        next += *it;
+                    }
+                }
+                if (!next.empty())
+                    result.emplace_back(std::stoll(next),
+                            true); // this case shouldn't even happen
+                return result;
+            }
+
+        struct PackedContigInfo {
+            size_t fileOrder;
+            size_t offset;
+            uint32_t length;
+        };
+
+        struct Position {
+            uint32_t transcript_id_;
+            uint32_t pos_;
+
+            Position() {
+                transcript_id_ = std::numeric_limits<decltype(transcript_id_)>::max();
+                pos_ = std::numeric_limits<decltype(pos_)>::max();
+            }
+
+            Position(uint32_t tid, uint32_t tpos, bool torien) {
+                transcript_id_ = tid;
+                pos_ = tpos;
+                setOrientation(torien);
+            }
+
+            void setOrientation(bool orientation) {
+                if (orientation) {
+                    pos_ |= 1 << 31;
+                } else {
+                    pos_ &= 0x7FFFFFFF;
+                }
+            }
+
+            inline uint32_t transcript_id() { return transcript_id_; }
+            inline uint32_t pos() { return (pos_ & 0x7FFFFFFF); }
+            inline bool orientation() { return (pos_ & 0x80000000); }
+
+            template <class Archive> void serialize(Archive& ar) {
+                ar(transcript_id_, pos_);
+            }
+        };
 
 
 
@@ -152,29 +220,96 @@ KSEQ_INIT(gzFile, gzread)
             //Create the thread pool 
             ThreadPool<InputSeqContainer, MI_Type> threadPool( [this](InputSeqContainer* e) {return buildHelper(e);}, param.threads);
 
+            spp::sparse_hash_map<uint64_t, std::vector<std::pair<uint64_t, bool>>> path;
+            spp::sparse_hash_map<uint64_t, PackedContigInfo> contigid2seq;
+            spp::sparse_hash_map<uint64_t, std::vector<Position>> contig2pos;
+            std::vector<std::string> refMap;
+            std::vector<uint32_t> refLengths;
+            size_t k;
+
             for(const auto &fileName : param.gfaSequences)
             {
                 FILE *file = fopen(fileName.c_str(), "r");
                 std::string str;
                 std::ifstream input(fileName.c_str());
-                std::ofstream myfile;
+                std::ofstream myfile,myfile1;
                 myfile.open ("temp.fa",ios::out);
+                myfile1.open("mapping.txt",ios::out);
+                size_t contig_cnt{0};
+                size_t ref_cnt{0};
+
                 while(getline(input,str)){
                     char firstC = str[0];
                     if (firstC != 'S' and firstC != 'P'){
-                          continue;
+                        continue;
                     }
                     stx::string_view lnview(str);
                     std::vector<stx::string_view> splited = split(lnview, '\t');
                     string tag = splited[0].to_string();
                     string id = splited[1].to_string();
                     string value = splited[2].to_string();
-                    
+
                     if(tag=="S"){
                         myfile << ">" << id << "\n" << value << endl;
                     }
+                    else if(tag=="P"){
+                        /*TODO* handle k*/
+                        k=4;
+                        auto pvalue = splited[2];
+                        std::vector<std::pair<uint64_t, bool>> contigVec = explode(pvalue, ',');
+                        path[ref_cnt] = contigVec;
+                        uint32_t refLength{0};
+                        bool firstContig{true};
+
+                        for (auto& ctig : contigVec) {
+                            int32_t l = contigid2seq[ctig.first].length - (firstContig ? 0 : (k-1));
+                            refLength += l;
+                            firstContig = false;
+                        }
+
+                        refLengths.push_back(refLength);
+                        refMap.push_back(id);
+                        ref_cnt++;
+                    }
                 }
+
+                //Make the pufferfish mapping in file.
+                uint64_t pos = 0;
+                uint64_t accumPos;
+                uint64_t currContigLength = 0;
+                uint64_t total_output_lines = 0;
+                for (auto const& ent : path) {
+                    const uint64_t& tr = ent.first;
+                    const std::vector<std::pair<uint64_t, bool>>& contigs = ent.second;
+                    accumPos = 0;
+                    for (size_t i = 0; i < contigs.size(); i++) {
+                        if (contig2pos.find(contigs[i].first) == contig2pos.end()) {
+                            contig2pos[contigs[i].first] = {};
+                            total_output_lines += 1;
+                        }
+                        if (contigid2seq.find(contigs[i].first) == contigid2seq.end()) {
+                            std::cerr << contigs[i].first << "\n";
+                        }
+                        pos = accumPos;
+                        currContigLength = contigid2seq[contigs[i].first].length;
+                        accumPos += currContigLength - k;
+                        (contig2pos[contigs[i].first])
+                            .push_back(Position(tr, pos, contigs[i].second));
+                    }
+                }
+                myfile1<<"Contig ID : space_seperated(transcript_id,position)"<<endl;
+                for(auto &e : contig2pos){
+                    std::vector<Position> temp=e.second;
+                    myfile1 << e.first<<":";
+                    for(auto &v :temp){
+                        myfile1 << v.transcript_id()<<","<<v.pos()<<" ";
+                    }
+                    myfile1 << endl;
+                }
+
+
                 myfile.close();
+                myfile1.close();
             }
 
             for(const auto &fileName : param.refSequences)
