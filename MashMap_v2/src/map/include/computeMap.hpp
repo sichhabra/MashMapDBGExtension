@@ -817,17 +817,24 @@ namespace skch
         for(auto &e : readMappings)
         {
           assert(e.refSeqId < this->refSketch.metadata.size());
+          if(contig2pos.count(stoi(this->refSketch.metadata[e.refSeqId].name))!=0){
+              vector<Position> temp=contig2pos[stoi(this->refSketch.metadata[e.refSeqId].name)];
+              for(auto &t : temp){
+                    outstrm  << (param.filterMode == filter::ONETOONE ? qmetadata[e.querySeqId].name : queryName)
+                    << " " << e.queryLen 
+                    << " " << e.queryStartPos
+                    << " " << e.queryEndPos
+                    << " " << (e.strand == strnd::FWD ? "+" : "-") 
+                    << " " << this->refSketch.metadata[e.refSeqId].name
+                    << " " << this->refSketch.metadata[e.refSeqId].len
+                    << " " << e.refStartPos 
+                    << " " << e.refEndPos
+                    << " " << e.nucIdentity;
+              }
+          }
+          else{
+          }
 
-          outstrm  << (param.filterMode == filter::ONETOONE ? qmetadata[e.querySeqId].name : queryName)
-            << " " << e.queryLen 
-            << " " << e.queryStartPos
-            << " " << e.queryEndPos
-            << " " << (e.strand == strnd::FWD ? "+" : "-") 
-            << " " << this->refSketch.metadata[e.refSeqId].name
-            << " " << this->refSketch.metadata[e.refSeqId].len
-            << " " << e.refStartPos 
-            << " " << e.refEndPos
-            << " " << e.nucIdentity;
 
 #ifdef DEBUG
           outstrm << std::endl;
