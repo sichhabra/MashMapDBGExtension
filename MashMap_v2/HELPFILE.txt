@@ -1,10 +1,13 @@
 To run mashmap:
 
+make clean
+sudo make install
+
 ./mashmap -g test.gfa-r temp.fa -q query.fa -k 4 -s 500
 
 test.gfa: GFA File.
 query.fa: Query File.
-temp.fa: Temporary FASTA file(created itself).
+temp.fa: Temporary FASTA file(no more needed/created, just passed in command for parseCmd dependencies).
 4: kmer size.
 500: seq length.
 
