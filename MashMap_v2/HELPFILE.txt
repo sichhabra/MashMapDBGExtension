@@ -7,7 +7,7 @@ sudo make install
 
 test.gfa: GFA File.
 query.fa: Query File.
-temp.fa: Temporary FASTA file(no more needed/created, just passed in command for parseCmd dependencies).
+temp.fa: Temporary FASTA file(no more created, just passed in command(empty dummy file) for parseCmd dependencies).
 4: kmer size.
 500: seq length.
 

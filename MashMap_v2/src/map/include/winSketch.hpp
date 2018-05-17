@@ -231,8 +231,8 @@ namespace skch
                     FILE *file = fopen(fileName.c_str(), "r");
                     std::string str;
                     std::ifstream input(fileName.c_str());
-                    std::ofstream myfile,myfile1;
-                    myfile.open ("temp.fa",ios::out);
+                    std::ofstream myfile1;
+                    //myfile.open ("temp.fa",ios::out);
                     myfile1.open("mapping.txt",ios::out);
                     size_t contig_cnt{0};
                     size_t ref_cnt{0};
@@ -259,7 +259,7 @@ namespace skch
 
                         if(tag=="S"){
                             mymap[id]=value;
-                            myfile << ">" << id << "\n" << value << endl;
+                            //myfile << ">" << id << "\n" << value << endl;
                             auto nid = std::stoull(splited[1].to_string());
                             (void)nid;
                             auto clen = splited[2].length();
@@ -320,7 +320,7 @@ namespace skch
                         myfile1 << endl;
                     }
 
-                    myfile.close();
+                    //myfile.close();
                     myfile1.close();
                 }
 
