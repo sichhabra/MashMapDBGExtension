@@ -177,7 +177,6 @@ namespace skch
                 uint32_t length;
             };
 
-
             private:
 
             /**
@@ -190,6 +189,7 @@ namespace skch
             //Frequency histogram of minimizers
             //[... ,x -> y, ...] implies y number of minimizers occur x times
             std::map<int, int> minimizerFreqHistogram;
+            std::map<std::string, std::string> mymap;
 
             public:
 
@@ -250,7 +250,15 @@ namespace skch
                         string id = splited[1].to_string();
                         string value = splited[2].to_string();
 
+                        /*kseq_t *seq1 = (kseq_t*)calloc(1, sizeof(kseq_t));
+                          kstream_t *ks = (kstream_t*)calloc(1, sizeof(kstream_t));    
+                          gzFile fp = gzdopen(fileno(file), "r");
+                          ks->f = fp;
+                          ks->buf = (char*)malloc(1024);
+                          seq1->f = ks;*/
+
                         if(tag=="S"){
+                            mymap[id]=value;
                             myfile << ">" << id << "\n" << value << endl;
                             auto nid = std::stoull(splited[1].to_string());
                             (void)nid;
@@ -324,24 +332,25 @@ namespace skch
 #endif
 
                     //Open the file using kseq
-                    FILE *file = fopen(fileName.c_str(), "r");
-                    gzFile fp = gzdopen(fileno(file), "r");
-                    kseq_t *seq = kseq_init(fp);
+                    //FILE *file = fopen("temp.fa", "r");
+                    //gzFile fp = gzdopen(fileno(file), "r");
+                    //kseq_t *seq = kseq_init(fp);
 
 
                     //size of sequence
                     offset_t len;
 
-                    while ((len = kseq_read(seq)) >= 0) 
+                    for(auto &e:mymap) 
                     {
+                        len=e.second.length();
                         //Save the sequence name
-                        metadata.push_back( ContigInfo{seq->name.s, (offset_t)seq->seq.l} );
+                        metadata.push_back( ContigInfo{e.first, (offset_t)len} );
 
                         //Is the sequence too short?
                         if(len < param.windowSize || len < param.kmerSize)
                         {
 #ifdef DEBUG
-                            cout<<len<<":"<<param.windowSize<<":"<<param.kmerSize<<":"<<seq->seq.s<<endl;
+                            //cout<<len<<":"<<param.windowSize<<":"<<param.kmerSize<<":"<<seq->seq.s<<endl;
                             std::cout << "WARNING, skch::Sketch::build, found an unusually short sequence relative to kmer and window size" << std::endl;
 #endif
                             seqCounter++;
@@ -349,7 +358,7 @@ namespace skch
                         }
                         else
                         {
-                            threadPool.runWhenThreadAvailable(new InputSeqContainer(seq->seq.s, seq->name.s, len, seqCounter));
+                            threadPool.runWhenThreadAvailable(new InputSeqContainer(e.second.c_str(), e.first.c_str(), len, seqCounter));
 
                             //Collect output if available
                             while ( threadPool.outputAvailable() )
@@ -361,9 +370,9 @@ namespace skch
 
                     sequencesByFileInfo.push_back(seqCounter);
 
-                    kseq_destroy(seq);  
-                    gzclose(fp); //close the file handler 
-                    fclose(file);
+                    //kseq_destroy(seq);  
+                    //gzclose(fp); //close the file handler 
+                    //fclose(file);
                 }
 
 
